@@ -1,6 +1,7 @@
 
 import pandas as pd
 import numpy as np
+import math as Math
 
 # Load the CSV file into a DataFrame
 file_Path = '../data/unigram_freq.csv'
@@ -9,17 +10,13 @@ count = 0
 
 
 # trim to first 3000 rows
+df = df.sort_values(by='count', ascending=False)
 df = df.head(6)
-
 
 def get_huffman_code(df = df.head(6)):
 
     # Dictionary to store the Huffman tree
     huffman_tree = {}
-
-
-    #sorting count
-    df = df.sort_values(by='count', ascending=False)
 
 
     while len(df) > 1:
@@ -83,10 +80,9 @@ def get_huffman_code(df = df.head(6)):
 
 
 
-def Fano_code(df = df.head(6)):
+def Fano_prosedure(df = df.head(6)):
 
     #sorting count
-    df = df.sort_values(by='count', ascending=False)
 
     # Create a new column to store the Fano code
     df['fano_code'] = ""
@@ -97,21 +93,49 @@ def Fano_code(df = df.head(6)):
     # Calculate the total frequency
     total_freq = df['count'].sum()
 
-    # Calculate the average frequency
-    avg_freq = total_freq / len(df)
 
+    # Calculate the average frequency
+    df['Normalized_cf'] = df['cumulative_freq'] / total_freq
+
+    min_index = (df['Normalized_cf']-0.5).abs().idxmin()
+    print(df)
+    print(f"min index:{min_index}")
+    return min_index
     
 
-Fano_code()
+
+def Fano_code(df):
+
+
+
+    count = 0
+    df = df.sort_values(by='count', ascending=False)
+
+    if count >= 10:
+        return df
+    #Split the dataframe
+    smallest_index = Fano_prosedure(df)
+
+    
+    if len(df) > 1:
+        left = df.iloc[:smallest_index+1].reset_index(drop=True)
+        right = df.iloc[smallest_index+1:].reset_index(drop=True)
+
+
+    else:
+        return df
+
+    count += 1
+
+    Fano_code(left)
+    Fano_code(right)
+    
+    return df
 
 
 
 
-
-
-
-
-
+Fano_code(df)
 
 
 
