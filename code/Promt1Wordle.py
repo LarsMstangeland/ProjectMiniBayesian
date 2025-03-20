@@ -3,8 +3,11 @@ import pandas as pd
 import numpy as np
 import math as Math
 
+import os
+
+
 # Load the CSV file into a DataFrame
-file_Path = '../data/unigram_freq.csv'
+file_Path = './data/unigram_freq.csv'
 df = pd.read_csv(file_Path)
 count = 0
 
@@ -41,8 +44,7 @@ def get_huffman_code(df = df.head(6)):
         # Store parent-child relationship in Huffman tree
         huffman_tree[UniqueKey] = {"left": word1['word'], "right": word2['word'], "frequency": sum_freq}
 
-
-
+   
         #dictionary of the words
         Set1 = {UniqueKey: sum_freq}
 
@@ -71,17 +73,20 @@ def get_huffman_code(df = df.head(6)):
     # print(df.head())
     # print(len(df))
 
-    # Print the Huffman tree dictionary
+    #Print the Huffman tree dictionary
     print("\nHuffman Tree Structure:")
     for key, value in huffman_tree.items():
         print(f"{key}: {value}")
 
     # print how many nodes are in the tree
 
+    return huffman_tree
 
 
 def Fano_prosedure(df = df.head(6)):
-
+    """
+    Finds the best split for Fano code
+    """
     #sorting count
 
     # Create a new column to store the Fano code
@@ -103,16 +108,16 @@ def Fano_prosedure(df = df.head(6)):
     return min_index
     
 
+fano_tree={}
 
-def Fano_code(df):
+def Fano_code(df, prefix):
 
 
 
-    count = 0
+   
     df = df.sort_values(by='count', ascending=False)
 
-    if count >= 10:
-        return df
+
     #Split the dataframe
     smallest_index = Fano_prosedure(df)
 
@@ -120,30 +125,58 @@ def Fano_code(df):
     if len(df) > 1:
         left = df.iloc[:smallest_index+1].reset_index(drop=True)
         right = df.iloc[smallest_index+1:].reset_index(drop=True)
-
+        
 
     else:
-        return df
+        word = df.iloc[0]['word']
+        fano_tree[word] = prefix
+        return 
 
-    count += 1
-
-    Fano_code(left)
-    Fano_code(right)
     
-    return df
+    Fano_code(left, prefix + "0")
+    Fano_code(right, prefix + "1")
+
+
+    
+
+
+    
+    return fano_tree
 
 
 
 
-Fano_code(df)
+
+
+def get_probability_for_word(word, df = df):
+    """
+    Get the probability of a word in the DataFrame
+    """
+    word_row = df[df['word'] == word]
+    if len(word_row) == 0:
+        return 0
+    return word_row['count'].values[0] / df['count'].sum()
+
+
+word_probs = {word: get_probability_for_word(word) for word in df['word']}
+
+print(word_probs)
+
+def get_steps_in_fano(word, fano_tree):
+    """
+    Get the number of steps in Fano code for a word
+    """
+    return len(fano_tree[word])
 
 
 
+def average_code_length_fano(fano_tree, word_probs):
+    """
+    Calculate the average code length for Fano code
+    """
+    return sum([get_steps_in_fano(word, fano_tree) * word_probs[word] for word in word_probs])
 
-
-
-
-
+print(f"Average code length for Fano code: {average_code_length_fano(Fano_code(df, prefix=''), word_probs)}")
 
 
 
