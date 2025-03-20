@@ -14,7 +14,7 @@ count = 0
 
 # trim to first 3000 rows
 df = df.sort_values(by='count', ascending=False)
-df = df.head(6)
+df = df.head(31)
 
 def get_huffman_code(df = df.head(6)):
 
@@ -64,9 +64,9 @@ def get_huffman_code(df = df.head(6)):
 
 
 
-    print("\nFinal Huffman Tree Root Node:")
-    print(df.head())
-    print(f"Total Nodes in Final Tree: {len(df)}")
+    # print("\nFinal Huffman Tree Root Node:")
+    # print(df.head())
+    # print(f"Total Nodes in Final Tree: {len(df)}")
 
 
 
@@ -74,13 +74,36 @@ def get_huffman_code(df = df.head(6)):
     # print(len(df))
 
     #Print the Huffman tree dictionary
-    print("\nHuffman Tree Structure:")
-    for key, value in huffman_tree.items():
-        print(f"{key}: {value}")
+    # print("\nHuffman Tree Structure:")
+    # for key, value in huffman_tree.items():
+    #     print(f"{key}: {value}")
 
     # print how many nodes are in the tree
 
     return huffman_tree
+
+def make_huffman_code(huffman_tree, prefix, node, huffman_code):
+    if node not in huffman_tree:
+        huffman_code[node] = prefix
+        return
+
+    left = huffman_tree[node]['left']
+    right = huffman_tree[node]['right']
+
+    make_huffman_code(huffman_tree, prefix + "0", left, huffman_code)
+    make_huffman_code(huffman_tree, prefix + "1", right, huffman_code)
+
+    return huffman_code
+
+
+# tree = get_huffman_code()
+# root = list(tree.keys())[-1]
+# print(make_huffman_code(tree, "", root, {}))
+
+
+
+
+
 
 
 def Fano_prosedure(df = df.head(6)):
@@ -103,8 +126,8 @@ def Fano_prosedure(df = df.head(6)):
     df['Normalized_cf'] = df['cumulative_freq'] / total_freq
 
     min_index = (df['Normalized_cf']-0.5).abs().idxmin()
-    print(df)
-    print(f"min index:{min_index}")
+    # print(df)
+    # print(f"min index:{min_index}")
     return min_index
     
 
@@ -160,7 +183,7 @@ def get_probability_for_word(word, df = df):
 
 word_probs = {word: get_probability_for_word(word) for word in df['word']}
 
-print(word_probs)
+# print(word_probs)
 
 def get_steps_in_fano(word, fano_tree):
     """
@@ -179,6 +202,22 @@ def average_code_length_fano(fano_tree, word_probs):
 print(f"Average code length for Fano code: {average_code_length_fano(Fano_code(df, prefix=''), word_probs)}")
 
 
+def get_steps_in_huffman(word, huffman_tree):
+    """
+    Get the number of steps in Huffman code for a word
+    """
+    return len(huffman_tree[word])
+
+def average_code_length_huffman(huffman_tree, word_probs):
+    """
+    Calculate the average code length for Huffman code
+    """
+    return sum([get_steps_in_huffman(word, huffman_tree) * word_probs[word] for word in word_probs])
+
+huffman_tree = get_huffman_code()
+root_node = list(huffman_tree.keys())[-1]
+huffman_code = make_huffman_code(huffman_tree, "", root_node, {})
+print(f"Average code length for Huffman code: {average_code_length_huffman(huffman_code, word_probs)}")
 
 
 
@@ -191,13 +230,7 @@ print(f"Average code length for Fano code: {average_code_length_fano(Fano_code(d
 
 
 
-
-
-
-
-
-
-
+# print(f"Average code length for Huffman code: {average_code_length_huffman(make_huffman_code(get_huffman_code()), word_probs)}")
 
 
 
