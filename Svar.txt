@@ -1,1 +1,5 @@
-When constructing a Fano tree we see that the number of unkown words in the nodes could be skwewed. Meaning a tree of i words could after the first yes/no split condition away either set 1 or set 2 of possible words. Where the size of sets differ. This becomes a problem when in the average case we wish to gain the most information from a splitt.
+When constructing a Fano tree we see that the number of unkown words in the nodes could be skwewed. 
+Meaning a tree of i words could after the first yes/no split condition away either set 1 or set 2 of possible words. 
+Where the size of sets differ.
+This becomes a problem when in the average case we wish to gain the most information from a splitt. In essence, by using the huffman approach, 
+we would find our most probable words from the data would always be higher up in the decision tree and therefore give a lower avarge number of steps

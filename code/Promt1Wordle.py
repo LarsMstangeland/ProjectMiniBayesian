@@ -14,13 +14,13 @@ count = 0
 
 # trim to first 3000 rows
 df = df.sort_values(by='count', ascending=False)
-df = df.head(31)
+df = df.head(3000)
 
-def get_huffman_code(df = df.head(6)):
+#Build the Huffman tree
+def get_huffman_code(df):
 
     # Dictionary to store the Huffman tree
     huffman_tree = {}
-
 
     while len(df) > 1:
 
@@ -96,11 +96,6 @@ def make_huffman_code(huffman_tree, prefix, node, huffman_code):
     return huffman_code
 
 
-# tree = get_huffman_code()
-# root = list(tree.keys())[-1]
-# print(make_huffman_code(tree, "", root, {}))
-
-
 
 
 
@@ -134,9 +129,6 @@ def Fano_prosedure(df = df.head(6)):
 fano_tree={}
 
 def Fano_code(df, prefix):
-
-
-
    
     df = df.sort_values(by='count', ascending=False)
 
@@ -159,14 +151,8 @@ def Fano_code(df, prefix):
     Fano_code(left, prefix + "0")
     Fano_code(right, prefix + "1")
 
-
-    
-
-
     
     return fano_tree
-
-
 
 
 
@@ -192,14 +178,12 @@ def get_steps_in_fano(word, fano_tree):
     return len(fano_tree[word])
 
 
-
 def average_code_length_fano(fano_tree, word_probs):
     """
     Calculate the average code length for Fano code
     """
     return sum([get_steps_in_fano(word, fano_tree) * word_probs[word] for word in word_probs])
 
-print(f"Average code length for Fano code: {average_code_length_fano(Fano_code(df, prefix=''), word_probs)}")
 
 
 def get_steps_in_huffman(word, huffman_tree):
@@ -214,18 +198,22 @@ def average_code_length_huffman(huffman_tree, word_probs):
     """
     return sum([get_steps_in_huffman(word, huffman_tree) * word_probs[word] for word in word_probs])
 
-huffman_tree = get_huffman_code()
+huffman_tree = get_huffman_code(df)
 root_node = list(huffman_tree.keys())[-1]
+
 huffman_code = make_huffman_code(huffman_tree, "", root_node, {})
-print(f"Average code length for Huffman code: {average_code_length_huffman(huffman_code, word_probs)}")
+
+fano_code = Fano_code(df, prefix='')
 
 
+Huffman_avg_steps = average_code_length_huffman(huffman_code, word_probs)
+Fano_avg_steps = average_code_length_fano(fano_code, word_probs)
 
+difference_in_approaches = abs(Fano_avg_steps - Huffman_avg_steps)
 
-
-
-
-
+print(f"Average code length for Fano code: {Fano_avg_steps}")
+print(f"Average code length for Huffman code: {Huffman_avg_steps}")
+print(f"Difference in approaches: {difference_in_approaches}")
 
 
 
