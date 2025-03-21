@@ -7,8 +7,8 @@ import os
 
 
 # Load the CSV file into a DataFrame
-file_Path = './data/unigram_freq.csv'
-df = pd.read_csv(file_Path)
+file_Path = '../data/unigram_freq.csv'
+df = pd.read_csv(file_Path, keep_default_na=False)
 count = 0
 
 
@@ -161,10 +161,14 @@ def get_probability_for_word(word, df = df):
     """
     Get the probability of a word in the DataFrame
     """
+
+    word = str(word)
     word_row = df[df['word'] == word]
     if len(word_row) == 0:
         return 0
     return word_row['count'].values[0] / df['count'].sum()
+
+
 
 
 word_probs = {word: get_probability_for_word(word) for word in df['word']}
@@ -216,16 +220,29 @@ print(f"Average code length for Huffman code: {Huffman_avg_steps}")
 print(f"Difference in approaches: {difference_in_approaches}")
 
 
+# compute shannon entropy
+
+def FindH(word_probs):
+    """
+    Compute Shannon Entropy
+    """
+    H = 0
+    for word in word_probs:
+        H += word_probs[word] * Math.log2(word_probs[word])
+    H = -H
+    return H
+
+
+
+
+H = FindH(word_probs)
+print(f"Shannon Entropy: {H}")
+
 
 
 # print(f"Average code length for Huffman code: {average_code_length_huffman(make_huffman_code(get_huffman_code()), word_probs)}")
 
-
-
-
-
-
-
+# 
 
 
 
