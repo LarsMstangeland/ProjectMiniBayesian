@@ -29,10 +29,16 @@ for _ in range(time_steps):
     measurements.append(measurement.flatten())
 
 
-# Run Kalman filter
-filtered_states = []
-for z in measurements:
-    x_est, P, _ = kalman_update(x_est, P, z.reshape(-1, 1), R[0, 0])
-    filtered_states.append(x_est.flatten())
+
+
+
+#lab 4
+plt.plot([s[0] for s in true_states], label='True State')
+plt.plot([s[0] for s in filtered_states], label='Filtered State')
+plt.scatter(range(time_steps), [m[0] for m in measurements], label='Measurements', color='red', s=1)
+plt.legend()
+plt.show()
+# Run Kalman filters
+kalman_update()
 
 
