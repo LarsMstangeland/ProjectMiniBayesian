@@ -190,10 +190,16 @@ def main():
     plt.tight_layout()
     plt.show()
 
-if __name__ == "__main__":
-    main()
 
-
+sigma = 10.0
+rho = 28.0
+beta = 8/3
+dt = 0.02
+t_end = 20.0
+x0 = [1.0, 1.0, 1.0]
+R = np.eye(2) * 0.2
+Q = np.eye(3)
+seed = 42
 
 # Define the Lorenz system
 def lorenz_system(t, state):
@@ -204,9 +210,7 @@ def lorenz_system(t, state):
     return [dxdt, dydt, dzdt]
 
 
-def generate_lorenz_data(sigma=10.0, rho=28.0, beta=8/3,
-                         dt=0.02, t_end=20.0, x0=[1.0, 1.0, 1.0],
-                         R_val=0.2, seed=42):
+def generate_lorenz_data():
     """
     Generates a Lorenz trajectory by numerically integrating the ODE,
     then adds measurement noise for observations of (x, y).
@@ -223,8 +227,10 @@ def generate_lorenz_data(sigma=10.0, rho=28.0, beta=8/3,
       true_states: shape (N, 3), the solution of the Lorenz system [x, y, z].
       measurements: shape (N, 2), noisy measurements of [x, y].
     """
-    np.random.seed(seed)
 
+
+
+    np.random.seed(seed)
 
     # Build the time array and solve the ODE
     N = round(t_end / dt)
@@ -234,8 +240,11 @@ def generate_lorenz_data(sigma=10.0, rho=28.0, beta=8/3,
     # True states: shape (N, 3) after transposing sol.y (which is (3, N))
     true_states = sol.y.T
 
-    # Measurement noise covariance R (2x2). We measure (x, y) only.
-    R = np.eye(2) * R_val
+    H = np.array([[1, 0, 0], [0, 1, 0]])
+
+    #inital state and covariance
+    x_est = np.array([1,1,1])
+    P = np.eye(3) * 1.0
 
     # Generate measurement noise. We draw N samples from N(0, R).
     # shape: (N,2). Then we multiply by sqrtm(R).T for correlated if needed.
@@ -249,23 +258,9 @@ def generate_lorenz_data(sigma=10.0, rho=28.0, beta=8/3,
     return time_span, true_states, measurements
 
 
-
-sigma = 10.0
-rho = 28.0
-beta = 8/3
-
-
 # Generate Lorenz data
-t_array, X_true, Y_meas = generate_lorenz_data(
-    sigma=sigma, rho=rho, beta=beta,
-    dt=0.02, t_end=20,
-    x0=[1,1,1],
-    R_val=0.2,
-    seed=42
-)
+t_array, X_true, Y_meas = generate_lorenz_data()
     
-
-
 
 def lorenz_jacobian(x_est, sigma=10, rho=28, beta=8/3):
     """Compute the Jacobian matrix for the Lorenz system at state x"""
@@ -299,6 +294,9 @@ def kalman_update_lorenz(x, P, y, m, R):
         P_new: Updated state covariance matrix
     """
 
+    m = m.reshape(-1, 1)
+    x = x.reshape(-1, 1)
+
     # Compute predicted measurement (scalar)
     y_pred = m.T @ x
     
@@ -309,19 +307,22 @@ def kalman_update_lorenz(x, P, y, m, R):
     S = (m.T @ (P @ m)) + R
     
     # Kalman Gain (vector)
-    K = (P @ m) / S
+    if np.isscalar(S):
+        K = (P @ m) / S
+    else:
+        K = (P @ m) @ np.linalg.inv(S)
     
     # Update state estimate
-    x_new = x + K @ innovation
+    x_new = x + K * innovation
     
     # Update covariance matrix using outer product
-    P_new = P - np.outer(K, m.T @ P)
+    P_new = P - np.outer(K.flatten(), (m.T @ P).flatten())
         
-    return x_new, P_new
+    return x_new.flatten(), P_new
 
-def kalman_predict(x_est, P_est, A, Q):
+def kalman_predict(x_est, P_est, A, Q, dt):
 
-    f = lorenz_system(x_est)
+    f = lorenz_system(0, x_est)
     J = lorenz_jacobian(x_est)
     A = scipy.linalg.expm(J*dt)
 
@@ -338,9 +339,11 @@ def iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed, dt = 0
 
     x_est_array = np.zeros((time_steps, 3))
     measurements = np.zeros(time_steps)
+    information_gains = np.zeros(time_steps)
 
 
     if Fixed:
+        m_fixed = np.array([1.0, 0.0, 0.0])
         for k in range(time_steps):            
 
             # Predict
@@ -353,12 +356,20 @@ def iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed, dt = 0
             xk_true = x_true[k]
 
             # Generate measurement: same noise draw, but direction = [1,0]
-            H = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
-            y = m @ xk_true + measurement_noises[k]
+
+            y = m_fixed @ xk_true + measurement_noises[k]
+
+            pre_det = np.linalg.det(P_pred)
+
 
             # Update
-            x_est, P_est = kalman_update_lorenz(x_pred, P_pred, y, H, R_val)
+            x_est, P_est = kalman_update_lorenz(x_pred, P_pred, y, m_fixed, R_val)
 
+            post_det = np.linalg.det(P_est)
+            
+            information_gains[k] = np.log(pre_det/post_det)
+
+            #store results
             x_est_array[k] = x_est
             measurements[k] = y
     
@@ -378,13 +389,20 @@ def iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed, dt = 0
             # Generate measurement using the *same* noise draw as the fixed approach
             y = m @ xk_true + measurement_noises[k]
 
+            pre_det = np.linalg.det(P_pred)
+
             # Update
             x_est, P_est = kalman_update_lorenz(x_pred, P_pred, y, m, R_val)
 
+
+            post_det = np.linalg.det(P_est)
+            information_gains[k] = np.log(pre_det/post_det)
+
+            #store results
             x_est_array[k] = x_est
             measurements[k] = y
 
-    return x_est_array, measurements
+    return x_est_array, measurements, information_gains
     
 #Make new values for the Lorenz system
 # Lorenz system parameters
@@ -396,16 +414,16 @@ def iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed, dt = 0
 
 
 #get start values
-x_true = X_true
+t_array, x_true, Y_meas = generate_lorenz_data()
 A = np.eye(3)
 Q = np.eye(3) * 0.01
 R_val = 0.2
-measurement_noises = Y_meas[:,0]
+measurement_noises = Y_meas[:,0] - x_true[:,0]
 
 
 # Run the Kalman filter
-states1, measurements1 = iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed=True, dt=0.02)
-states2, measurements2 = iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed=False, dt=0.02)
+states1, measurements1, infogains1 = iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed=True, dt=0.02)
+states2, measurements2, infogains2 = iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed=False, dt=0.02)
 
 # Plot the results from fixed and adaptive Kalman filters
 plt.figure(figsize=(10,4))
@@ -429,8 +447,5 @@ plt.xlabel("Time")
 plt.ylabel("x[0]")
 plt.grid(True)
 plt.legend()
-
 plt.tight_layout()
 plt.show()
-
-
