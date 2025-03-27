@@ -190,6 +190,7 @@ def main():
     plt.tight_layout()
     plt.show()
 
+main()
 
 sigma = 10.0
 rho = 28.0
@@ -320,7 +321,7 @@ def kalman_update_lorenz(x, P, y, m, R):
         
     return x_new.flatten(), P_new
 
-def kalman_predict(x_est, P_est, A, Q, dt):
+def kalman_predict_lorenz(x_est, P_est, A, Q, dt):
 
     f = lorenz_system(0, x_est)
     J = lorenz_jacobian(x_est)
@@ -340,6 +341,7 @@ def iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed, dt = 0
     x_est_array = np.zeros((time_steps, 3))
     measurements = np.zeros(time_steps)
     information_gains = np.zeros(time_steps)
+    EntropyRate = np.zeros(time_steps)
 
 
     if Fixed:
@@ -347,9 +349,10 @@ def iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed, dt = 0
         for k in range(time_steps):            
 
             # Predict
-            A = scipy.linalg.expm(lorenz_jacobian(x_est)*dt)
-            x_pred, P_pred = kalman_predict(x_est, P_est, A, Q, dt)
+            jacobian = lorenz_jacobian(x_est)
 
+            A = scipy.linalg.expm(jacobian*dt)
+            x_pred, P_pred = kalman_predict_lorenz(x_est, P_est, A, Q, dt)
 
 
             # True state at step k
@@ -359,15 +362,25 @@ def iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed, dt = 0
 
             y = m_fixed @ xk_true + measurement_noises[k]
 
+
+            #Get variables for c)
             pre_det = np.linalg.det(P_pred)
+            diff_entropy = np.log(np.sqrt(2*np.pi*np.e*np.linalg.det(Q)))
 
 
             # Update
             x_est, P_est = kalman_update_lorenz(x_pred, P_pred, y, m_fixed, R_val)
 
+
             post_det = np.linalg.det(P_est)
+            J_eigen = np.linalg.eigvals(jacobian)
+            J_sum = sum(max(0, eigenval.real) for eigenval in J_eigen)
             
-            information_gains[k] = np.log(pre_det/post_det)
+            
+            EntropyRate[k] = diff_entropy + np.log(np.abs(np.linalg.det(jacobian)) + 1e-10)            
+            #information gain
+            SignalNoise = (m_fixed.T @ P_pred @ m_fixed) / R_val
+            information_gains[k] = 1/2*np.log(1 + SignalNoise)
 
             #store results
             x_est_array[k] = x_est
@@ -376,8 +389,9 @@ def iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed, dt = 0
     else:
         for k in range(time_steps):
             # Predict
-            A = scipy.linalg.expm(lorenz_jacobian(x_est)*dt)
-            x_pred, P_pred = kalman_predict(x_est, P_est, A, Q, dt)
+            jacobian = lorenz_jacobian(x_est)
+            A = scipy.linalg.expm(jacobian*dt)
+            x_pred, P_pred = kalman_predict_lorenz(x_est, P_est, A, Q, dt)
 
             # True state at step k
             xk_true = x_true[k]
@@ -389,20 +403,29 @@ def iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed, dt = 0
             # Generate measurement using the *same* noise draw as the fixed approach
             y = m @ xk_true + measurement_noises[k]
 
+            #Get variables for c)
             pre_det = np.linalg.det(P_pred)
+            diff_entropy = np.log(np.sqrt(2*np.pi*np.e*np.linalg.det(Q)))
+
 
             # Update
             x_est, P_est = kalman_update_lorenz(x_pred, P_pred, y, m, R_val)
 
 
             post_det = np.linalg.det(P_est)
-            information_gains[k] = np.log(pre_det/post_det)
+            J_eigen = np.linalg.eigvals(jacobian)
+            J_sum = sum(max(0, eigenval.real) for eigenval in J_eigen)
+            EntropyRate[k] = diff_entropy + np.log(np.abs(np.linalg.det(jacobian)) + 1e-10)   
+                     
+            #information gain
+            SignalNoise = (m.T @ P_pred @ m) / R_val
+            information_gains[k] = 1/2*np.log(1 + SignalNoise)
 
             #store results
             x_est_array[k] = x_est
             measurements[k] = y
 
-    return x_est_array, measurements, information_gains
+    return x_est_array, measurements, information_gains, EntropyRate
     
 #Make new values for the Lorenz system
 # Lorenz system parameters
@@ -422,11 +445,12 @@ measurement_noises = Y_meas[:,0] - x_true[:,0]
 
 
 # Run the Kalman filter
-states1, measurements1, infogains1 = iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed=True, dt=0.02)
-states2, measurements2, infogains2 = iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed=False, dt=0.02)
+states1, measurements1, infogains1, EntropyRate1 = iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed=True, dt=0.02)
+states2, measurements2, infogains2, EntropyRate2 = iterate_kalman_lorenz(x_true, A, Q, R_val, measurement_noises, Fixed=False, dt=0.02)
+
+
 
 # Plot the results from fixed and adaptive Kalman filters
-plt.figure(figsize=(10,4))
 plt.figure(figsize=(10,4))
 plt.subplot(1,2,1)
 plt.plot(t_array, x_true[:,0], label="True State")
@@ -449,3 +473,26 @@ plt.grid(True)
 plt.legend()
 plt.tight_layout()
 plt.show()
+
+#c) Calculate the entropy rate of the proxess.
+
+# Make first the differential entropy in the process noise distribution.
+
+#then calculate the log determinant of the jacobi matrix from each step. We take a average over that.
+Avarage_information_gain1 = np.mean(infogains1)
+Avarage_information_gain2 = np.mean(infogains2)
+
+EntropyRate1 = np.mean(EntropyRate1)
+EntropyRate2 = np.mean(EntropyRate2)
+
+#The entropy rate is the sum of the differential entropy and the average information gain.
+
+
+
+#Average information gain over all measurements taken
+
+print(f"Average information gain for fixed measurement: {Avarage_information_gain1}")
+print(f"Average information gain for adaptive measurement: {Avarage_information_gain2}")
+
+print(f"Entropy rate for measurement: {EntropyRate1}")
+print(f"Entropy rate for adaptive measurement: {EntropyRate2}")
